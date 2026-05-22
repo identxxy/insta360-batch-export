@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Build outputs
+apps/insta_batch_export/cpp_exporter/build/
+build/
+dist/
+
+# Local SDKs and proprietary/binary payloads
+CameraSDK-*/
+Linux_CameraSDK-*/
+libMediaSDK-*/
+media-sdk-root/
+*.deb
+*.tar
+*.tar.gz
+*.tar.xz
+*.zip
+
+# Local exports and smoke outputs
+tmp/
+exports/
+output/
+*.mp4
+*.insv
+*.lrv
+
+# Local env/config
+env.sh
+.env
+.env.*
+BUILD_ENV.md
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
