@@ -57,7 +57,14 @@ POSITIONS = tuple(config_store.POSITIONS)
 MEDIA_ROOT = Path("/media/vox")
 TIMESTAMP_TOLERANCE_SECONDS = 3
 DEFAULT_EXPORTER_PATH = APP_DIR / "cpp_exporter" / "build" / "insta_media_exporter"
-PROFILE_RESOLUTION_PRESETS = ("3840x1920", "1920x960")
+PROFILE_RESOLUTION_PRESETS = ("3840x1920", "7680x3840", "1920x960", "960x480")
+
+
+def _default_exporter_path():
+    env_value = os.environ.get("INSTA_EXPORTER_PATH")
+    if env_value:
+        return Path(env_value).expanduser()
+    return DEFAULT_EXPORTER_PATH
 
 
 def _default_model_root():
@@ -94,6 +101,7 @@ class GuiMediaItem:
         seq_id,
         basename,
         has_lrv,
+        recording_label=None,
     ):
         self.mount_id = mount_id
         self.mount_path = mount_path
@@ -102,6 +110,7 @@ class GuiMediaItem:
         self.seq_id = seq_id
         self.basename = basename
         self.has_lrv = has_lrv
+        self.recording_label = recording_label
 
 
 VIDEO_RE = re.compile(
@@ -196,6 +205,20 @@ def _item_seq_id(item):
     return match.group("seq") if match else ""
 
 
+def _item_recording_label(item):
+    label = _item_value(item, "recording_label")
+    if label:
+        return str(label).strip()
+    return ""
+
+
+def _set_item_recording_label(item, label):
+    if isinstance(item, dict):
+        item["recording_label"] = label
+        return
+    setattr(item, "recording_label", label)
+
+
 def _normalize_media_item(item):
     timestamp = _item_timestamp(item)
     video_path = _item_video_path(item)
@@ -210,6 +233,7 @@ def _normalize_media_item(item):
         seq_id=_item_seq_id(item),
         basename=basename,
         has_lrv=bool(_item_value(item, "has_lrv", False)),
+        recording_label=_item_value(item, "recording_label"),
     )
 
 
@@ -267,6 +291,7 @@ def _fallback_scan_mounts(root):
                 seq_id=match.group("seq"),
                 basename=video_path.name,
                 has_lrv=_find_lrv_for_video(video_path),
+                recording_label=None,
             )
         )
     return items
@@ -381,11 +406,29 @@ def _video_cell_key(pos, item):
     return "{}|{}".format(pos, _item_video_path(item))
 
 
+def _ensure_recording_label(item):
+    if item is None:
+        return
+    if _item_value(item, "recording_label", None) is not None:
+        return
+    label = ""
+    if media_scan is not None and hasattr(media_scan, "probe_video_metadata"):
+        try:
+            label = media_scan.probe_video_metadata(_item_video_path(item))
+        except Exception:
+            label = ""
+    _set_item_recording_label(item, label)
+
+
 def _video_cell_label(item):
     timestamp = _item_timestamp(item)
     first_line = timestamp.strftime("%Y-%m-%d %H:%M:%S") if timestamp else "unknown time"
     seq_id = _item_seq_id(item) or "unknown_seq"
-    return "{}\nseq {}\n{}".format(first_line, seq_id, _item_basename(item))
+    lines = [first_line, "seq {}".format(seq_id), _item_basename(item)]
+    recording_label = _item_recording_label(item)
+    if recording_label:
+        lines.append("source {}".format(recording_label))
+    return "\n".join(lines)
 
 
 def _video_item_colors(status, selected):
@@ -557,9 +600,9 @@ class ExportWorker(QThread):
                 kwargs[name] = progress_callback
 
         if "exporter_path" in parameters:
-            kwargs["exporter_path"] = str(DEFAULT_EXPORTER_PATH)
+            kwargs["exporter_path"] = str(_default_exporter_path())
         if "model_root" in parameters:
-            kwargs["model_root"] = str(DEFAULT_MODEL_ROOT)
+            kwargs["model_root"] = _default_model_root()
 
         if kwargs:
             return run_export_queue(tasks, **kwargs)
@@ -1012,6 +1055,8 @@ class MainWindow(QMainWindow):
             self.sequence_table.insertRow(row_index)
             for col, pos in enumerate(POSITIONS):
                 item = row.get(pos)
+                if item:
+                    _ensure_recording_label(item)
                 table_item = QTableWidgetItem(_video_cell_label(item) if item else "")
                 if item:
                     cell_key = _video_cell_key(pos, item)
@@ -1160,7 +1205,7 @@ class MainWindow(QMainWindow):
             "capture_time": timestamp,
             "timestamp": timestamp,
             "overwrite": self.overwrite_checkbox.isChecked(),
-            "exporter_path": str(DEFAULT_EXPORTER_PATH),
+            "exporter_path": str(_default_exporter_path()),
             "model_root": _default_model_root(),
             "output_size": profile["output_size"],
             "enable_flowstate": profile["enable_flowstate"],

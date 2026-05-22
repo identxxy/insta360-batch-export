@@ -12,6 +12,7 @@ SYSTEM_LIBCUDA_CANDIDATES = (
     "/lib/x86_64-linux-gnu/libcuda.so.1",
     "/usr/lib/x86_64-linux-gnu/libcuda.so.1",
 )
+MEDIA_SDK_LIBRARY_NAME = "libMediaSDK.so"
 
 
 class ExportTask:
@@ -172,6 +173,10 @@ def build_export_command(task, output_path=None, log_path=None):
 
 def build_export_env(base_env=None, system_libcuda_candidates=None):
     env = dict(os.environ if base_env is None else base_env)
+    media_sdk_lib_dir = resolve_media_sdk_lib_dir(env)
+    if media_sdk_lib_dir is not None:
+        _prepend_env_path(env, "LD_LIBRARY_PATH", media_sdk_lib_dir)
+
     candidates = system_libcuda_candidates or SYSTEM_LIBCUDA_CANDIDATES
     for candidate in candidates:
         path = Path(candidate)
@@ -184,6 +189,29 @@ def build_export_env(base_env=None, system_libcuda_candidates=None):
         env["LD_PRELOAD"] = " ".join([str(path)] + existing_parts)
         return env
     return env
+
+
+def resolve_media_sdk_lib_dir(env=None):
+    env = dict(os.environ if env is None else env)
+    direct_lib = env.get("INSTA_MEDIASDK_LIB")
+    if direct_lib:
+        path = Path(direct_lib).expanduser()
+        if path.name == MEDIA_SDK_LIBRARY_NAME and path.is_file():
+            return path.parent
+
+    direct_dir = env.get("MEDIA_SDK_LIB_DIR")
+    if direct_dir:
+        path = Path(direct_dir).expanduser()
+        if (path / MEDIA_SDK_LIBRARY_NAME).is_file():
+            return path
+
+    sdk_root = env.get("MEDIA_SDK_ROOT")
+    if sdk_root:
+        path = Path(sdk_root).expanduser() / "lib"
+        if (path / MEDIA_SDK_LIBRARY_NAME).is_file():
+            return path
+
+    return None
 
 
 def run_export_task(task, overwrite=False, manifest_path=None, manifest_lock=None):
@@ -335,6 +363,15 @@ def _coerce_process_text(value):
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return str(value)
+
+
+def _prepend_env_path(env, key, path):
+    path_text = str(path)
+    existing = env.get(key, "").strip()
+    parts = [part for part in existing.split(os.pathsep) if part]
+    if path_text in parts:
+        return
+    env[key] = os.pathsep.join([path_text] + parts)
 
 
 def _default_task_id(capture_time, mount_id, seq_id, pos):

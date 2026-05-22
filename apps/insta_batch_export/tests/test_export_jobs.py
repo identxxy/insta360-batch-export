@@ -10,6 +10,7 @@ from apps.insta_batch_export.core.export_jobs import (
     build_export_env,
     build_export_command,
     build_output_path,
+    resolve_media_sdk_lib_dir,
     run_export_queue,
     run_export_task,
 )
@@ -167,6 +168,37 @@ sys.exit({exit_code!r})
             self.assertEqual(
                 env["LD_PRELOAD"],
                 "{} /already/preloaded.so".format(libcuda_path),
+            )
+
+    def test_build_export_env_prepends_insta_mediasdk_lib_parent(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sdk_lib = Path(tmpdir) / "sdk" / "libMediaSDK.so"
+            sdk_lib.parent.mkdir(parents=True)
+            sdk_lib.write_text("", encoding="utf-8")
+
+            env = build_export_env(
+                base_env={
+                    "INSTA_MEDIASDK_LIB": str(sdk_lib),
+                    "LD_LIBRARY_PATH": "/already/lib",
+                },
+                system_libcuda_candidates=[],
+            )
+
+            self.assertEqual(
+                env["LD_LIBRARY_PATH"],
+                "{}:/already/lib".format(sdk_lib.parent),
+            )
+
+    def test_resolve_media_sdk_lib_dir_supports_media_sdk_root(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "usr"
+            lib_dir = root / "lib"
+            lib_dir.mkdir(parents=True)
+            (lib_dir / "libMediaSDK.so").write_text("", encoding="utf-8")
+
+            self.assertEqual(
+                resolve_media_sdk_lib_dir({"MEDIA_SDK_ROOT": str(root)}),
+                lib_dir,
             )
 
     def test_run_export_task_skips_existing_output_without_overwrite_and_writes_manifest(self):

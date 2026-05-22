@@ -62,7 +62,8 @@ apps/insta_batch_export/cpp_exporter/build/insta_media_exporter \
 
 ## GUI Setup
 
-PySide6 is required for the GUI:
+PySide6 is required for the GUI. `ffprobe` from FFmpeg is optional but needed
+for source recording resolution/fps labels inside each video cell:
 
 ```bash
 cd /home/vox/instaSDK
@@ -79,6 +80,34 @@ python -m pip install -r apps/insta_batch_export/requirements.txt
 python apps/insta_batch_export/gui_app.py
 ```
 
+## MediaSDK Runtime Paths
+
+Users need their own Insta360 MediaSDK installation. The public repo and public
+release artifacts do not include `libMediaSDK.so` or SDK model files.
+
+For a full online-user setup guide, see:
+
+```text
+docs/online_user_setup.md
+```
+
+Before running exports, set the model path and one of the library path
+variables:
+
+```bash
+export INSTA_MEDIA_MODELS_DIR=/path/to/libMediaSDK-dev-*/models
+
+# Preferred: direct path to libMediaSDK.so.
+export INSTA_MEDIASDK_LIB=/path/to/media-sdk-root/usr/lib/libMediaSDK.so
+
+# Alternatives supported by the GUI/export queue:
+export MEDIA_SDK_LIB_DIR=/path/to/media-sdk-root/usr/lib
+export MEDIA_SDK_ROOT=/path/to/media-sdk-root/usr
+```
+
+The Python export queue automatically prepends the resolved MediaSDK library
+directory to `LD_LIBRARY_PATH` for the exporter subprocess.
+
 ## Workflow
 
 1. Insert/mount the five SD cards under `/media/vox`.
@@ -94,10 +123,13 @@ python apps/insta_batch_export/gui_app.py
    denoise, and direction lock.
 6. Assign a profile to each position. All positions use `Default 4K` unless
    changed.
-7. Click video cells to toggle selected/unselected.
-8. Choose an output directory.
-9. Set `max_parallel_exports`. Default is `1`; try `2` first on a large single GPU.
-10. Start export.
+7. Check each video cell's source recording label. The GUI probes visible
+   `.insv` files with `ffprobe` and shows source video stream resolution and
+   frame rate, for example `source 2x 1920x1920 @ 29.97fps`.
+8. Click video cells to toggle selected/unselected.
+9. Choose an output directory.
+10. Set `max_parallel_exports`. Default is `1`; try `2` first on a large single GPU.
+11. Start export.
 
 Default profile:
 
@@ -108,6 +140,13 @@ Default 4K:
   denoise: on
   direction lock: off
 ```
+
+Resolution presets:
+
+- `3840x1920`: default 4K panorama.
+- `7680x3840`: 8K panorama when the source footage and hardware support it.
+- `1920x960`: smoke/debug export.
+- `960x480`: fast preview export.
 
 Output path:
 
@@ -156,3 +195,15 @@ python3 -m py_compile \
 apps/insta_batch_export/cpp_exporter/build_exporter.sh
 ldd apps/insta_batch_export/cpp_exporter/build/insta_media_exporter
 ```
+
+## Offline Private Bundle
+
+For internal USB distribution, build a private offline bundle:
+
+```bash
+apps/insta_batch_export/packaging/build_offline_bundle.sh
+```
+
+The bundle is written under `dist/` and contains proprietary SDK runtime files
+and models copied from the local SDK installation. Do not publish that bundle to
+the public repository or a public release channel.

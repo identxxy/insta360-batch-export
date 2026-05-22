@@ -1,5 +1,10 @@
+import json
 import re
+import shutil
+import subprocess
+from collections import OrderedDict
 from datetime import datetime
+from fractions import Fraction
 from pathlib import Path
 
 
@@ -18,6 +23,7 @@ class MediaItem:
         mount_path,
         lrv_path=None,
         has_lrv=False,
+        recording_label=None,
     ):
         self.video_path = Path(video_path)
         self.timestamp = timestamp
@@ -28,6 +34,7 @@ class MediaItem:
         self.mount_path = Path(mount_path)
         self.lrv_path = Path(lrv_path) if lrv_path is not None else None
         self.has_lrv = has_lrv
+        self.recording_label = recording_label
 
     def __repr__(self):
         return (
@@ -73,7 +80,59 @@ def find_lrv_for_video(path):
     return None
 
 
-def scan_mounts(root="/media/vox"):
+def format_video_stream_metadata(streams):
+    stream_labels = OrderedDict()
+    for stream in streams or []:
+        label = _format_single_stream_metadata(stream)
+        if not label:
+            continue
+        stream_labels[label] = stream_labels.get(label, 0) + 1
+
+    labels = []
+    for label, count in stream_labels.items():
+        if count > 1:
+            labels.append("%dx %s" % (count, label))
+        else:
+            labels.append(label)
+    return " + ".join(labels)
+
+
+def probe_video_metadata(path, timeout_seconds=3):
+    if shutil.which("ffprobe") is None:
+        return ""
+
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v",
+        "-show_entries",
+        "stream=width,height,r_frame_rate,avg_frame_rate",
+        "-of",
+        "json",
+        str(path),
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if completed.returncode != 0:
+        return ""
+    try:
+        data = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError:
+        return ""
+    return format_video_stream_metadata(data.get("streams", []))
+
+
+def scan_mounts(root="/media/vox", probe_metadata=False):
     root_path = Path(root)
     items_by_mount = {}
     if not root_path.exists():
@@ -93,6 +152,8 @@ def scan_mounts(root="/media/vox"):
             lrv_path = find_lrv_for_video(video_path)
             item.lrv_path = lrv_path
             item.has_lrv = lrv_path is not None
+            if probe_metadata:
+                item.recording_label = probe_video_metadata(video_path)
             items.append(item)
 
         if items:
@@ -108,3 +169,44 @@ def _infer_mount_path(video_path):
         if dcim_index > 0:
             return Path(*parts[:dcim_index])
     return video_path.parent.parent.parent
+
+
+def _format_single_stream_metadata(stream):
+    if not isinstance(stream, dict):
+        return ""
+    try:
+        width = int(stream.get("width") or 0)
+        height = int(stream.get("height") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if width <= 0 or height <= 0:
+        return ""
+
+    fps = _format_fps(stream.get("avg_frame_rate")) or _format_fps(
+        stream.get("r_frame_rate")
+    )
+    if fps:
+        return "%dx%d @ %sfps" % (width, height, fps)
+    return "%dx%d @ unknown fps" % (width, height)
+
+
+def _format_fps(rate_text):
+    fps = _parse_frame_rate(rate_text)
+    if fps is None:
+        return ""
+    rounded = round(float(fps))
+    if abs(float(fps) - rounded) < 0.005:
+        return str(int(rounded))
+    return ("%.2f" % float(fps)).rstrip("0").rstrip(".")
+
+
+def _parse_frame_rate(rate_text):
+    if not rate_text:
+        return None
+    try:
+        value = Fraction(str(rate_text))
+    except (ValueError, ZeroDivisionError):
+        return None
+    if value <= 0:
+        return None
+    return value

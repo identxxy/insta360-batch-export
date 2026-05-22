@@ -67,6 +67,7 @@ sample footage. Install those separately according to Insta360's license terms.
 
 - Linux desktop with Python 3
 - PySide6 for the GUI
+- `ffprobe` from FFmpeg for source recording resolution/fps labels
 - `g++` for the C++ exporter
 - Insta360 MediaSDK installed locally
 - NVIDIA driver/CUDA runtime if using GPU export
@@ -78,7 +79,25 @@ export MEDIA_SDK_ROOT=/path/to/media-sdk-root/usr
 export INSTA_MEDIA_MODELS_DIR=/path/to/libMediaSDK-dev-*/models
 ```
 
-`MEDIA_SDK_ROOT` must contain `include/` and `lib/`.
+`MEDIA_SDK_ROOT` must contain `include/` and `lib/`. For binary releases that
+do not build against the SDK, users can instead point directly at the runtime
+library:
+
+```bash
+export INSTA_MEDIASDK_LIB=/path/to/media-sdk-root/usr/lib/libMediaSDK.so
+export INSTA_MEDIA_MODELS_DIR=/path/to/libMediaSDK-dev-*/models
+```
+
+The export queue resolves `INSTA_MEDIASDK_LIB`, `MEDIA_SDK_LIB_DIR`, or
+`MEDIA_SDK_ROOT`, then prepends the resolved directory to `LD_LIBRARY_PATH` for
+the exporter subprocess.
+
+For the full online-user setup, including where to place SDK files after
+approval, see:
+
+```text
+docs/online_user_setup.md
+```
 
 ## Install GUI Dependencies
 
@@ -111,10 +130,13 @@ Workflow:
    FlowState, denoise, and direction lock.
 5. Assign a profile to each position. All positions use `Default 4K` unless
    changed.
-6. Click video cells to select/unselect them.
-7. Choose an output directory.
-8. Set `max_parallel_exports`.
-9. Start export.
+6. Check each video cell's source recording label. The GUI probes visible
+   `.insv` files with `ffprobe` and shows source stream resolution and frame
+   rate, for example `source 2x 1920x1920 @ 29.97fps`.
+7. Click video cells to select/unselect them.
+8. Choose an output directory.
+9. Set `max_parallel_exports`.
+10. Start export.
 
 The default profile is:
 
@@ -125,6 +147,13 @@ Default 4K:
   denoise: on
   direction lock: off
 ```
+
+Resolution presets:
+
+- `3840x1920`: default 4K panorama.
+- `7680x3840`: 8K panorama when the source footage and hardware support it.
+- `1920x960`: smoke/debug export.
+- `960x480`: fast preview export.
 
 ## CUDA Driver Library Note
 
@@ -167,3 +196,6 @@ python3 -m py_compile \
   the GUI process.
 - `max_parallel_exports=1` is the safest default. Increase cautiously after
   checking GPU memory, NVENC load, CPU usage, and SD-card I/O.
+- Private offline bundles can be built with
+  `apps/insta_batch_export/packaging/build_offline_bundle.sh`, but generated
+  `dist/` bundles contain SDK binaries/models and must not be published.

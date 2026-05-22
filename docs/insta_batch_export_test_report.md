@@ -35,7 +35,7 @@ python3 -m unittest discover -s apps/insta_batch_export/tests -v
 Result:
 
 ```text
-Ran 23 tests in 1.704s
+Ran 30 tests in 1.714s
 OK
 ```
 
@@ -43,11 +43,14 @@ Covered behavior:
 
 - Parse `VID_*.insv` filenames.
 - Find matching `LRV_*.lrv`.
+- Format source recording resolution and frame rate labels from `ffprobe`
+  video stream metadata.
 - Scan `/media/vox`-style mount layout.
 - Group sequence rows by timestamp even when seq ids differ.
 - Build the manual per-position recent-video grid used by the GUI.
 - Persist per-position `show_last_n` config with a default of `10`.
 - Persist export profiles and per-position profile assignments.
+- Resolve bundle-local exporter path via `INSTA_EXPORTER_PATH`.
 - Generate output paths.
 - Build exporter commands.
 - Prepend the system `libcuda.so.1` to exporter `LD_PRELOAD` so MediaSDK does not use the sysroot `libcuda.so.1`.
@@ -55,6 +58,29 @@ Covered behavior:
 - Write logs and JSONL manifest.
 - Enforce `max_parallel_exports=2` with a fake exporter.
 - Fail stalled exporter subprocesses via `timeout_seconds` instead of waiting forever.
+
+### Offline Bundle Smoke Checks
+
+Command:
+
+```bash
+apps/insta_batch_export/packaging/build_offline_bundle.sh
+```
+
+Result:
+
+```text
+dist/insta360-batch-export-offline-linux-x86_64
+dist/insta360-batch-export-offline-linux-x86_64.tar.gz
+```
+
+Verified:
+
+- Bundle exporter has `$ORIGIN/../sdk/lib` RPATH.
+- Bundle does not contain `sdk/lib/libcuda.so.1`.
+- Bundle exporter `--help` runs with the bundled SDK library path.
+- GUI bundle starts in `QT_QPA_PLATFORM=offscreen` mode and reaches the Qt event
+  loop; the smoke command exits via `timeout`, as expected.
 
 ### Python Compile Check
 

@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from apps.insta_batch_export.core.media_scan import (
+    format_video_stream_metadata,
     find_lrv_for_video,
     parse_media_filename,
     scan_mounts,
@@ -11,6 +12,40 @@ from apps.insta_batch_export.core.media_scan import (
 
 
 class MediaScanTests(unittest.TestCase):
+    def test_format_video_stream_metadata_collapses_identical_streams(self):
+        label = format_video_stream_metadata(
+            [
+                {
+                    "width": 1920,
+                    "height": 1920,
+                    "r_frame_rate": "30000/1001",
+                    "avg_frame_rate": "30000/1001",
+                },
+                {
+                    "width": 1920,
+                    "height": 1920,
+                    "r_frame_rate": "30000/1001",
+                    "avg_frame_rate": "30000/1001",
+                },
+            ]
+        )
+
+        self.assertEqual(label, "2x 1920x1920 @ 29.97fps")
+
+    def test_format_video_stream_metadata_falls_back_to_r_frame_rate(self):
+        label = format_video_stream_metadata(
+            [
+                {
+                    "width": 3840,
+                    "height": 1920,
+                    "r_frame_rate": "30/1",
+                    "avg_frame_rate": "0/0",
+                }
+            ]
+        )
+
+        self.assertEqual(label, "3840x1920 @ 30fps")
+
     def test_parse_vid_filename_extracts_timestamp_sequence_and_mount(self):
         path = Path("/media/vox/3234-3330/DCIM/Camera01/VID_20260521_191237_00_006.insv")
 
