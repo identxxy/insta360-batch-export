@@ -35,7 +35,7 @@ python3 -m unittest discover -s apps/insta_batch_export/tests -v
 Result:
 
 ```text
-Ran 22 tests in 1.701s
+Ran 23 tests in 1.704s
 OK
 ```
 
@@ -47,6 +47,7 @@ Covered behavior:
 - Group sequence rows by timestamp even when seq ids differ.
 - Build the manual per-position recent-video grid used by the GUI.
 - Persist per-position `show_last_n` config with a default of `10`.
+- Persist export profiles and per-position profile assignments.
 - Generate output paths.
 - Build exporter commands.
 - Prepend the system `libcuda.so.1` to exporter `LD_PRELOAD` so MediaSDK does not use the sysroot `libcuda.so.1`.
