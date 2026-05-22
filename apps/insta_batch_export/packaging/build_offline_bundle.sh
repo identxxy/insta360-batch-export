@@ -73,6 +73,10 @@ mkdir -p "${PYI_WORK_ROOT}" "${PYI_DIST_ROOT}" "${PYI_SPEC_ROOT}"
   --windowed \
   --name "${PYI_APP_NAME}" \
   --paths "${APP_DIR}" \
+  --hidden-import core.config_store \
+  --hidden-import core.export_jobs \
+  --hidden-import core.media_scan \
+  --hidden-import core.sequence_grouping \
   --distpath "${PYI_DIST_ROOT}" \
   --workpath "${PYI_WORK_ROOT}" \
   --specpath "${PYI_SPEC_ROOT}" \
