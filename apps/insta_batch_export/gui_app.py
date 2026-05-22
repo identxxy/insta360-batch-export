@@ -57,7 +57,7 @@ POSITIONS = tuple(config_store.POSITIONS)
 MEDIA_ROOT = Path("/media/vox")
 TIMESTAMP_TOLERANCE_SECONDS = 3
 DEFAULT_EXPORTER_PATH = APP_DIR / "cpp_exporter" / "build" / "insta_media_exporter"
-PROFILE_RESOLUTION_PRESETS = ("3840x1920", "1920x960", "5760x2880")
+PROFILE_RESOLUTION_PRESETS = ("3840x1920", "1920x960")
 
 
 def _default_model_root():
